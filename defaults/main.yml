@@ -1,0 +1,10 @@
+---
+JENKINS_HOME: '/var/lib/jenkins'
+tmp_path: "/tmp/{{ env }}_jenkins_backup"
+
+s3_bucket_name: 'jenkins-backup-prod'
+
+aws_access_key: "aws_access_key"
+aws_secret_key: "aws_secret_key"
+aws_kms_region: 'us-west-2'
+aws_cmk_alias: "{{ env }}-jenkins-backup"

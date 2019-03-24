@@ -1,0 +1,6 @@
+---
+  - import_tasks: backup.yml
+    tags: [jenkins.backup.backup]
+
+  - import_tasks: s3.yml
+    tags: [jenkins.backup.s3]
