@@ -1,0 +1,95 @@
+---
+  - block:
+    - name: Get local system time
+      shell: "date +%Y%m%d%H%M"
+      register: timestamp
+
+    - name: Set timestamp
+      set_fact:
+        backup_time: "{{ timestamp.stdout }}"
+
+    - name: Set role facts
+      set_fact:
+        backup_path: "{{ tmp_path }}_{{ backup_time }}"
+        JENKINS_HOME: "{{ JENKINS_HOME }}"
+
+    - name: Create backup directory
+      file:
+        path: "{{ backup_path }}"
+        state: directory
+
+    - name: Create plugins and jobs directories
+      file:
+        path: "{{ backup_path }}/{{ item }}"
+        state: directory
+      with_items:
+        - 'plugins'
+        - 'jobs'
+
+    - name: Copy files
+      copy:
+        src: "{{ item }}"
+        dest: "{{ backup_path }}"
+      with_fileglob:
+        - "{{ JENKINS_HOME }}/*.xml"
+        - "{{ JENKINS_HOME }}/*.key"
+
+    - name: Copy directories
+      copy:
+        src: "{{ item }}"
+        dest: "{{ backup_path }}"
+      with_items:
+        - "{{ JENKINS_HOME }}/secrets"
+        - "{{ JENKINS_HOME }}/users"
+
+    - name: Discover Plugins
+      find:
+        paths: "{{ JENKINS_HOME }}/plugins"
+        patterns: "^.*?\\.(jpi)$"
+        use_regex: true
+        recurse: true
+      register: plugin_files
+
+    - name: Copy Plugins
+      copy:
+        src: "{{ item.path }}"
+        dest: "{{ backup_path }}/plugins/{{ item.path | basename }}"
+      with_items:
+        - "{{ plugin_files.files }}"
+
+    - name: Discover Jobs
+      find:
+        paths: "{{ JENKINS_HOME }}/jobs"
+        patterns: "^config\\.(xml)$"
+        use_regex: true
+        recurse: true
+      register: job_files
+
+    - name: Create jobs directories
+      file:
+        path: "{{ backup_path }}/jobs/{{ item.path.split('/')[5:-1] | join('/') }}"
+        state: directory
+      with_items:
+        - "{{ job_files.files }}"
+
+    - name: Copy job files into their respective directories
+      copy:
+        src: "{{ item.path }}"
+        dest: "{{ backup_path }}/jobs/{{ item.path.split('/')[5:-1] | join('/') }}/{{ item.path | basename }}"
+      with_items:
+        - "{{ job_files.files }}"
+
+    - set_fact:
+        archive_name: "{{ backup_path | basename }}.tar.gz"
+        archive_absolute_file_path: "{{ backup_path }}.tar.gz"
+
+    - name: "Archive {{ backup_path }}"
+      shell: "tar -zcf {{ archive_absolute_file_path }} -C {{ backup_path }} {{ backup_path }}"
+      args:
+        warn: no
+
+    - name: Archive name
+      debug:
+        msg: "{{ archive_name }} {{ archive_absolute_file_path }}"
+
+    become: true

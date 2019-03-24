@@ -1,0 +1,39 @@
+---
+  - name: Required Pip packages
+    pip:
+      name: "{{ item }}"
+    with_items:
+      - aws-encryption-sdk-cli
+    register: pip_out
+
+  - name: Get CMK Id
+    aws_kms_facts:
+    register: aws_kms_keys
+    failed_when: aws_kms_keys.keys is not defined
+
+  - name: Set Key Id
+    set_fact:
+      aws_cmk_id: "{{ item.key_id }}"
+    when: aws_cmk_alias in item.aliases
+    with_items: "{{ aws_kms_keys.get('keys') }}"
+
+  - name: Discovered key Id
+    debug:
+      msg: "{{ aws_cmk_id  }}"
+    when: aws_cmk_id is defined
+
+  - block:
+    - name: Encrypt backup archive
+      shell: "aws-encryption-cli --encrypt --input {{ archive_absolute_file_path }} --master-keys key='{{ aws_cmk_id | mandatory }}' --suppress-metadata --encryption-context backup='{{ archive_name }}' --output '{{ archive_absolute_file_path }}.encrypted'"
+
+    - name: Uploaded file to S3
+      no_log: true
+      aws_s3:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        bucket: "{{ s3_bucket_name }}"
+        object: "{{ archive_name }}"
+        src: "{{ archive_absolute_file_path }}.encrypted"
+        mode: put
+    when: archive_name is defined and archive_absolute_file_path is defined and aws_cmk_id is defined or (not pip_out.failed)
+    become: true
