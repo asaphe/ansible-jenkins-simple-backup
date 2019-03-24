@@ -4,6 +4,8 @@ A specific implementation of a Jenkins backup using S3 to save encrypted backup 
 due to memory and performance issues some Ansible Modules were dropped. (Trying to avoid running commands through shell)
 Ansible rsync module is still in use but performance might be a bit slow due to using it.
 
+* OS: Ubuntu 16.04+
+
 ## Assumptions
 
 - Using a Jenkins job to run the playbook
